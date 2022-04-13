@@ -105,7 +105,7 @@ func RunSetup(ui *input.UI) {
 			}
 			arn := strings.Split(s, ":")
 			if len(arn) == 6 {
-				if arn[0] == "arn" && arn[1] == "aws" && arn[2] == "iam" && arn[3] == "" && strings.HasPrefix(arn[5], "role/") {
+				if arn[0] == "arn" && strings.HasPrefix(arn[1], "aws") && arn[2] == "iam" && arn[3] == "" && strings.HasPrefix(arn[5], "role/") {
 					return nil
 				}
 			}
