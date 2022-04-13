@@ -11,7 +11,7 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-var lockDir = os.TempDir() + "/aws-clie-oidc-lock"
+var lockDir = os.TempDir() + "/aws-cli-oidc-lock"
 var locker lockgate.Locker
 var lockResource = "aws-cli-oidc"
 
