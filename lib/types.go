@@ -26,9 +26,3 @@ type LoginParams struct {
 	Display      string `url:"display,omitempty"`
 	Scope        string `url:"scope,omitempty"`
 }
-
-type param struct {
-	name  string
-	label string
-	mask  bool
-}

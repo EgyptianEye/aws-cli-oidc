@@ -14,11 +14,6 @@ import (
 
 // Wrapper around net/url and net/http.  Fluent style modeled from Java's JAX-RS
 
-type OAuthError struct {
-	err         string `json:"error"`
-	description string `json:"error_description"`
-}
-
 type RestClient struct {
 	httpClient *http.Client
 }
