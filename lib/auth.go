@@ -321,20 +321,22 @@ func launch(client *OIDCClient, url string, listener net.Listener) string {
 
 		// Response result page
 		message := "Login "
+		windowClose := " onLoad=\"window.close();\""
 		if code != "" {
 			message += "successful"
 		} else {
 			message += "failed"
+			windowClose = ""
 		}
 		res.Header().Set("Cache-Control", "no-store")
 		res.Header().Set("Pragma", "no-cache")
 		res.WriteHeader(200)
 		res.Write([]byte(fmt.Sprintf(`<!DOCTYPE html>
-<body>
+<body%s>
 %s
 </body>
 </html>
-`, message)))
+`, windowClose, message)))
 
 		if f, ok := res.(http.Flusher); ok {
 			f.Flush()
