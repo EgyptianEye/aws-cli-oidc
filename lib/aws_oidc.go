@@ -14,7 +14,9 @@ func GetCredentialsWithOIDC(client *OIDCClient, idToken, iamRoleArn string, dura
 func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
 	roleSessionName := client.config.GetString(AWS_FEDERATION_ROLE_SESSION_NAME)
 
-	sess, err := session.NewSession()
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create session")
 	}
