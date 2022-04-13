@@ -7,8 +7,8 @@ require (
 	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c // indirect
 	github.com/PuerkitoBio/goquery v1.7.1 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
-	github.com/aws/aws-sdk-go v1.40.56 // indirect
-	github.com/beevik/etree v1.1.0 // indirect
+	github.com/aws/aws-sdk-go v1.40.56
+	github.com/beevik/etree v1.1.0
 	github.com/briandowns/spinner v1.16.0 // indirect
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -21,26 +21,26 @@ require (
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
-	github.com/mitchellh/go-homedir v1.1.0 // indirect
+	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
-	github.com/natsukagami/go-input v0.0.0-20180603034138-38bb793e9754 // indirect
-	github.com/nirasan/go-oauth-pkce-code-verifier v0.0.0-20170819232839-0fbfe93532da // indirect
+	github.com/natsukagami/go-input v0.0.0-20180603034138-38bb793e9754
+	github.com/nirasan/go-oauth-pkce-code-verifier v0.0.0-20170819232839-0fbfe93532da
 	github.com/pelletier/go-toml v1.9.4 // indirect
-	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
+	github.com/pkg/errors v0.9.1
 	github.com/robertkrimen/otto v0.0.0-20211004134430-12a632260352 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
-	github.com/spf13/cobra v1.2.1 // indirect
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/spf13/viper v1.9.0 // indirect
+	github.com/spf13/viper v1.9.0
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tidwall/gjson v1.9.2 // indirect
 	github.com/tidwall/match v1.1.0 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/versent/saml2aws v2.17.0+incompatible // indirect
+	github.com/versent/saml2aws v2.17.0+incompatible
 	github.com/zalando/go-keyring v0.1.1
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519 // indirect
 	golang.org/x/net v0.0.0-20211005215030-d2e5035098b3 // indirect
@@ -60,7 +60,25 @@ require (
 )
 
 require (
+	github.com/aws/aws-sdk-go-v2/config v1.15.3
 	github.com/gofrs/flock v0.7.1 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
+)
+
+require (
+	github.com/aws/aws-sdk-go-v2 v1.16.2
+	github.com/aws/aws-sdk-go-v2/service/sts v1.16.3
+)
+
+require (
+	github.com/aws/aws-sdk-go-v2/credentials v1.11.2 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.12.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.9 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.4.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.3.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.9.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.11.3 // indirect
+	github.com/aws/smithy-go v1.11.2 // indirect
+	github.com/headzoo/ut v0.0.0-20181013193318-a13b5a7a02ca // indirect
 )

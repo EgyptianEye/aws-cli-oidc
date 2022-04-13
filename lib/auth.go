@@ -22,8 +22,9 @@ import (
 )
 
 func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds int64, useSecret, asJson bool) {
+	conf := client.config
 	// Resolve target IAM Role ARN
-	defaultIAMRoleArn := client.config.GetString(DEFAULT_IAM_ROLE_ARN)
+	defaultIAMRoleArn := conf.GetString(DEFAULT_IAM_ROLE_ARN)
 	if roleArn == "" {
 		roleArn = defaultIAMRoleArn
 	}
@@ -39,14 +40,14 @@ func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds 
 	if !isValid(awsCreds) || err != nil {
 		tokenResponse, err := doLogin(client)
 		if err != nil {
-			Writeln("Failed to login the OIDC provider")
-			Exit(err)
+			Exit(errors.New("Failed to login the OIDC provider"))
 		}
 
 		Writeln("Login successful!")
 		Traceln("ID token: %s", tokenResponse.IDToken)
 
-		awsFedType := client.config.GetString(AWS_FEDERATION_TYPE)
+		awsFedType := conf.GetString(AWS_FEDERATION_TYPE)
+		awsSessName := conf.GetString(AWS_FEDERATION_ROLE_SESSION_NAME)
 
 		// Resolve max duration
 		if maxSessionDurationSeconds <= 0 {
@@ -57,33 +58,27 @@ func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds 
 			}
 		}
 
-		if awsFedType == AWS_FEDERATION_TYPE_OIDC {
-			awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, maxSessionDurationSeconds)
-			if err != nil {
-				Writeln("Failed to get aws credentials with OIDC")
-				Exit(err)
-			}
-		} else if awsFedType == AWS_FEDERATION_TYPE_SAML2 {
+		switch awsFedType {
+		case AWS_FEDERATION_TYPE_OIDC:
+			awsCreds, err = GetCredentialsWithOIDC(tokenResponse.IDToken, awsSessName, roleArn, maxSessionDurationSeconds)
+		case AWS_FEDERATION_TYPE_OIDC_V2:
+			awsCreds, err = GetCredentialsWithOIDCV2(tokenResponse.IDToken, awsSessName, roleArn, int32(maxSessionDurationSeconds))
+		case AWS_FEDERATION_TYPE_SAML2:
 			samlAssertion, err := getSAMLAssertion(client, tokenResponse)
 			if err != nil {
-				Writeln("Failed to get SAML2 assertion from OIDC provider")
-				Exit(err)
+				Exit(fmt.Errorf("Failed to get SAML2 assertion from OIDC provider: %w", err))
 			}
-
 			samlResponse, err := createSAMLResponse(client, samlAssertion)
 			if err != nil {
-				Writeln("Failed to create SAML Response")
-				Exit(err)
+				Exit(fmt.Errorf("Failed to create SAML Response: %w", err))
 			}
-
 			awsCreds, err = GetCredentialsWithSAML(samlResponse, maxSessionDurationSeconds, roleArn)
-			if err != nil {
-				Writeln("Failed to get aws credentials with SAML2")
-				Exit(err)
-			}
-		} else {
-			Writeln("Invalid AWS federation type")
-			Exit(err)
+		default:
+			Exit(fmt.Errorf("Invalid AWS federation type: %s", awsFedType))
+		}
+
+		if err != nil {
+			Exit(fmt.Errorf("Failed to get aws credentials with %s: %w", strings.ToUpper(awsFedType), err))
 		}
 
 		if useSecret {

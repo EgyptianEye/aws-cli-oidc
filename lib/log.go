@@ -35,6 +35,7 @@ func Traceln(format string, msg ...interface{}) {
 func Exit(err error) {
 	if err != nil {
 		Writeln(err.Error())
+		os.Exit(1)
 	}
-	os.Exit(1)
+	os.Exit(0)
 }

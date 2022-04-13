@@ -7,13 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func GetCredentialsWithOIDC(client *OIDCClient, idToken, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
-	return loginToStsUsingIDToken(client, idToken, iamRoleArn, durationInSeconds)
+func GetCredentialsWithOIDC(idToken, roleSessionName, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
+	return loginToStsUsingIDToken(idToken, roleSessionName, iamRoleArn, durationInSeconds)
 }
 
-func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
-	roleSessionName := client.config.GetString(AWS_FEDERATION_ROLE_SESSION_NAME)
-
+func loginToStsUsingIDToken(idToken, roleSessionName, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
 	sess, err := session.NewSession()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create session")

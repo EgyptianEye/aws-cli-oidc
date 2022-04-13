@@ -77,8 +77,8 @@ func RunSetup(ui *input.UI) {
 		Required: true,
 		Loop:     true,
 		ValidateFunc: func(s string) error {
-			if s != AWS_FEDERATION_TYPE_SAML2 && s != AWS_FEDERATION_TYPE_OIDC {
-				return errors.New(fmt.Sprintf("Input must be '%s' or '%s'", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_SAML2))
+			if s != AWS_FEDERATION_TYPE_SAML2 && s != AWS_FEDERATION_TYPE_OIDC && s != AWS_FEDERATION_TYPE_OIDC_V2 {
+				return errors.New(fmt.Sprintf("Input must be '%s', '%s' or '%s'", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_OIDC_V2, AWS_FEDERATION_TYPE_SAML2))
 			}
 			return nil
 		},
@@ -129,7 +129,7 @@ func RunSetup(ui *input.UI) {
 	config[MAX_SESSION_DURATION_SECONDS] = maxSessionDurationSeconds
 	config[DEFAULT_IAM_ROLE_ARN] = defaultIAMRoleArn
 
-	if answerFedType == AWS_FEDERATION_TYPE_OIDC {
+	if answerFedType == AWS_FEDERATION_TYPE_OIDC || answerFedType == AWS_FEDERATION_TYPE_OIDC_V2 {
 		oidcSetup(ui, config)
 	} else if answerFedType == AWS_FEDERATION_TYPE_SAML2 {
 		saml2Setup(ui, config)

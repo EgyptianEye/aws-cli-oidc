@@ -33,6 +33,7 @@ const TOKEN_TYPE_ID_TOKEN = "urn:ietf:params:oauth:token-type:id_token"
 
 // Federation Type
 const AWS_FEDERATION_TYPE_OIDC = "oidc"
+const AWS_FEDERATION_TYPE_OIDC_V2 = "oidc-v2"
 const AWS_FEDERATION_TYPE_SAML2 = "saml2"
 
 var configdir string
