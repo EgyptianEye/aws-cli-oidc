@@ -1,6 +1,15 @@
 package lib
 
-import "time"
+import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
+)
 
 type AWSCredentials struct {
 	Version         int
@@ -9,6 +18,48 @@ type AWSCredentials struct {
 	AWSSessionToken string    `json:"SessionToken"`
 	PrincipalARN    string    `json:"-"`
 	Expires         time.Time `json:"Expiration"`
+}
+
+func (c *AWSCredentials) isValid() bool {
+	if c == nil {
+		return false
+	}
+	sess, err := session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	})
+	if err != nil {
+		Writeln("Failed to create aws client session")
+		Exit(err)
+	}
+	creds := credentials.NewStaticCredentialsFromCreds(credentials.Value{
+		AccessKeyID:     c.AWSAccessKey,
+		SecretAccessKey: c.AWSSecretKey,
+		SessionToken:    c.AWSSessionToken,
+	})
+	svc := sts.New(sess, aws.NewConfig().WithCredentials(creds))
+	input := &sts.GetCallerIdentityInput{}
+	_, err = svc.GetCallerIdentity(input)
+	if err != nil {
+		Writeln("The previous credential isn't valid")
+	}
+	return err == nil
+}
+
+func (c *AWSCredentials) JSON() (string, error) {
+	c.Version = 1
+	bs, err := json.Marshal(c)
+	if err != nil {
+		return "", fmt.Errorf("Unexpected AWS credential response: %w", err)
+	}
+	return string(bs), nil
+}
+
+func (c *AWSCredentials) Export() (string, error) {
+	return export(map[string]string{
+		"AWS_ACCESS_KEY_ID":     c.AWSAccessKey,
+		"AWS_SECRET_ACCESS_KEY": c.AWSSecretKey,
+		"AWS_SESSION_TOKEN":     c.AWSSessionToken,
+	}), nil
 }
 
 type TokenResponse struct {

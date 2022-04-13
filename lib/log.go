@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strings"
 )
 
 var IsTraceEnabled bool
@@ -16,14 +17,22 @@ func Writeln(format string, msg ...interface{}) {
 	fmt.Fprintln(os.Stderr, fmt.Sprintf(format, msg...))
 }
 
-func Export(key string, value string) {
-	var msg string
+func export(kv map[string]string) string {
+	prefix := "export "
+	suffix := []byte{0x0a}
 	if runtime.GOOS == "windows" {
-		msg = fmt.Sprintf("set %s=%s\n", key, value)
-	} else {
-		msg = fmt.Sprintf("export %s=%s\n", key, value)
+		prefix = "set "
+		suffix = append([]byte{0xd}, suffix...)
 	}
-	fmt.Fprint(os.Stdout, msg)
+	var builder strings.Builder
+	for k, v := range kv {
+		builder.WriteString(prefix)
+		builder.WriteString(k)
+		builder.WriteByte(0x3d)
+		builder.WriteString(v)
+		builder.Write(suffix)
+	}
+	return builder.String()
 }
 
 func Traceln(format string, msg ...interface{}) {
@@ -35,6 +44,7 @@ func Traceln(format string, msg ...interface{}) {
 func Exit(err error) {
 	if err != nil {
 		Writeln(err.Error())
+		os.Exit(1)
 	}
-	os.Exit(1)
+	os.Exit(0)
 }

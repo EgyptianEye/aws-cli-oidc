@@ -3,7 +3,6 @@ package lib
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,134 +10,61 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/beevik/etree"
 	pkce "github.com/nirasan/go-oauth-pkce-code-verifier"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
 )
 
-func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds int64, useSecret, asJson bool) {
+func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds int64) (*AWSCredentials, error) {
+	conf := client.config
 	// Resolve target IAM Role ARN
-	defaultIAMRoleArn := client.config.GetString(DEFAULT_IAM_ROLE_ARN)
+	defaultIAMRoleArn := conf.GetString(DEFAULT_IAM_ROLE_ARN)
 	if roleArn == "" {
 		roleArn = defaultIAMRoleArn
 	}
-
-	var awsCreds *AWSCredentials
-	var err error
-
-	// Try to reuse stored credential in secret
-	if useSecret {
-		awsCreds, err = AWSCredential(roleArn)
-	}
-
-	if !isValid(awsCreds) || err != nil {
-		tokenResponse, err := doLogin(client)
-		if err != nil {
-			Writeln("Failed to login the OIDC provider")
-			Exit(err)
-		}
-
-		Writeln("Login successful!")
-		Traceln("ID token: %s", tokenResponse.IDToken)
-
-		awsFedType := client.config.GetString(AWS_FEDERATION_TYPE)
-
-		// Resolve max duration
-		if maxSessionDurationSeconds <= 0 {
-			maxSessionDurationSecondsString := client.config.GetString(MAX_SESSION_DURATION_SECONDS)
-			maxSessionDurationSeconds, err = strconv.ParseInt(maxSessionDurationSecondsString, 10, 64)
-			if err != nil {
-				maxSessionDurationSeconds = 3600
-			}
-		}
-
-		if awsFedType == AWS_FEDERATION_TYPE_OIDC {
-			awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, maxSessionDurationSeconds)
-			if err != nil {
-				Writeln("Failed to get aws credentials with OIDC")
-				Exit(err)
-			}
-		} else if awsFedType == AWS_FEDERATION_TYPE_SAML2 {
-			samlAssertion, err := getSAMLAssertion(client, tokenResponse)
-			if err != nil {
-				Writeln("Failed to get SAML2 assertion from OIDC provider")
-				Exit(err)
-			}
-
-			samlResponse, err := createSAMLResponse(client, samlAssertion)
-			if err != nil {
-				Writeln("Failed to create SAML Response")
-				Exit(err)
-			}
-
-			awsCreds, err = GetCredentialsWithSAML(samlResponse, maxSessionDurationSeconds, roleArn)
-			if err != nil {
-				Writeln("Failed to get aws credentials with SAML2")
-				Exit(err)
-			}
-		} else {
-			Writeln("Invalid AWS federation type")
-			Exit(err)
-		}
-
-		if useSecret {
-			// Store into secret
-			SaveAWSCredential(roleArn, awsCreds)
-			Write("The AWS credentials has been saved in OS secret store")
-		}
-	}
-
-	if asJson {
-		awsCreds.Version = 1
-
-		jsonBytes, err := json.Marshal(awsCreds)
-		if err != nil {
-			Writeln("Unexpected AWS credential response")
-			Exit(err)
-		}
-		fmt.Println(string(jsonBytes))
-	} else {
-		Writeln("")
-
-		Export("AWS_ACCESS_KEY_ID", awsCreds.AWSAccessKey)
-		Export("AWS_SECRET_ACCESS_KEY", awsCreds.AWSSecretKey)
-		Export("AWS_SESSION_TOKEN", awsCreds.AWSSessionToken)
-	}
-}
-
-func isValid(cred *AWSCredentials) bool {
-	if cred == nil {
-		return false
-	}
-
-	sess, err := session.NewSession()
+	var (
+		awsCreds *AWSCredentials
+		err      error
+	)
+	tokenResponse, err := doLogin(client)
 	if err != nil {
-		Writeln("Failed to create aws client session")
-		Exit(err)
+		return nil, fmt.Errorf("Failed to login the OIDC provider: %w", err)
 	}
-
-	creds := credentials.NewStaticCredentialsFromCreds(credentials.Value{
-		AccessKeyID:     cred.AWSAccessKey,
-		SecretAccessKey: cred.AWSSecretKey,
-		SessionToken:    cred.AWSSessionToken,
-	})
-
-	svc := sts.New(sess, aws.NewConfig().WithCredentials(creds))
-
-	input := &sts.GetCallerIdentityInput{}
-
-	_, err = svc.GetCallerIdentity(input)
-
-	if err != nil {
-		Writeln("The previous credential isn't valid")
+	Writeln("Login successful!")
+	Traceln("ID token: %s", tokenResponse.IDToken)
+	awsFedType := conf.GetString(AWS_FEDERATION_TYPE)
+	// Resolve max duration
+	if maxSessionDurationSeconds <= 0 {
+		maxSessionDurationSecondsString := conf.GetString(MAX_SESSION_DURATION_SECONDS)
+		maxSessionDurationSeconds, err = strconv.ParseInt(maxSessionDurationSecondsString, 10, 64)
+		if err != nil {
+			maxSessionDurationSeconds = 3600
+		}
 	}
-
-	return err == nil
+	switch awsFedType {
+	case AWS_FEDERATION_TYPE_OIDC:
+		awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, maxSessionDurationSeconds)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get aws credentials with OIDC: %w", err)
+		}
+	case AWS_FEDERATION_TYPE_SAML2:
+		samlAssertion, err := getSAMLAssertion(client, tokenResponse)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get SAML2 assertion from OIDC provider: %w", err)
+		}
+		samlResponse, err := createSAMLResponse(client, samlAssertion)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create SAML Response: %w", err)
+		}
+		awsCreds, err = GetCredentialsWithSAML(samlResponse, maxSessionDurationSeconds, roleArn)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to get aws credentials with SAML2: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("Invalid AWS federation type: %s", strings.ToUpper(awsFedType))
+	}
+	return awsCreds, nil
 }
 
 func getSAMLAssertion(client *OIDCClient, tokenResponse *TokenResponse) (string, error) {
@@ -326,20 +252,22 @@ func launch(client *OIDCClient, url string, listener net.Listener) string {
 
 		// Response result page
 		message := "Login "
+		close := " onload=\"window.close();\""
 		if code != "" {
 			message += "successful"
 		} else {
 			message += "failed"
+			close = ""
 		}
 		res.Header().Set("Cache-Control", "no-store")
 		res.Header().Set("Pragma", "no-cache")
 		res.WriteHeader(200)
 		res.Write([]byte(fmt.Sprintf(`<!DOCTYPE html>
-<body>
+<body%s>
 %s
 </body>
 </html>
-`, message)))
+`, close, message)))
 
 		if f, ok := res.(http.Flusher); ok {
 			f.Flush()

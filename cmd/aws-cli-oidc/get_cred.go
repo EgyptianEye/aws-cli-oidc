@@ -1,6 +1,10 @@
 package main
 
 import (
+	"errors"
+	"fmt"
+	"os"
+
 	"github.com/openstandia/aws-cli-oidc/lib"
 	"github.com/spf13/cobra"
 )
@@ -35,9 +39,43 @@ func getCred(cmd *cobra.Command, args []string) {
 
 	client, err := lib.CheckInstalled(providerName)
 	if err != nil {
-		lib.Writeln("Failed to login OIDC provider")
-		lib.Exit(err)
+		lib.Exit(errors.New("Failed to login OIDC provider"))
 	}
 
-	lib.Authenticate(client, roleArn, maxDurationSeconds, useSecret, asJson)
+	lib.Exit(output(asJson)(authenticate(useSecret, client, roleArn, maxDurationSeconds)))
+}
+
+func output(json bool) func(*lib.AWSCredentials, error) error {
+	return func(cred *lib.AWSCredentials, err error) error {
+		if err != nil {
+			return err
+		}
+		if json {
+			js, err := cred.JSON()
+			if err == nil {
+				fmt.Println(js)
+			}
+			return err
+		}
+		exp, _ := cred.Export()
+		fmt.Fprintf(os.Stderr, "\n%s", exp)
+		return nil
+	}
+}
+
+func authenticate(useSecret bool, client *lib.OIDCClient, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
+	if useSecret {
+		// Try to reuse stored credential in secret
+		cred, err = lib.AWSCredential(roleArn)
+		if err == nil {
+			return
+		}
+	}
+	cred, err = lib.Authenticate(client, roleArn, maxDurationSeconds)
+	if err == nil && useSecret {
+		// Store into secret
+		lib.SaveAWSCredential(roleArn, cred)
+		lib.Write("The AWS credentials has been saved in OS secret store")
+	}
+	return
 }
