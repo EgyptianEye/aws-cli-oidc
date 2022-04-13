@@ -2,6 +2,21 @@
 
 CLI tool for retrieving AWS temporary credentials using OIDC provider.
 
+## Rationale behind my local modifications
+
+With All Due Respect, I ...
+
+- Turned off exec bits of some files, I am assuming the original author got a Windows laptop
+- Modified way of error reporting, but didn't change every case
+- Other opinionated tweaks, and ...
+
+The biggest problem it tried to solve: "No OpenIDConnect provider found in your account for ..."
+
+I was too impatient to read the details, recklessly redid the same functionality with AWS SDK v2.
+Later it turns out I could just use `env AWS_SDK_LOAD_CONFIG=1 aws-cli-oidc ...` to make it work...
+
+Anyways, I am not a fan of the env hack so I go with v2. Or maybe I should load the shared config?
+
 ## How does it work?
 
 [AWS Identity Providers and Federation](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html) supports IdPs that are compatible with [OpenID Connect (OIDC)](http://openid.net/connect/) or [SAML 2.0 (Security Assertion Markup Language 2.0)](https://wiki.oasis-open.org/security). This tool works with both types of IdP if it supports OIDC because it works as OIDC client. If the federation between the AWS account and the IdP is established, and an OIDC client for this tool is registered in the IdP, you can get AWS temporary credentials via standard browser login. It means you don't need to pass your credential of the IdP to this tool.
@@ -31,6 +46,10 @@ Also depending on the federation type between AWS and the OIDC provider, require
 
 - The OIDC provider only needs to support OIDC. SAML2 and OAuth 2.0 Token Exchange are not necessary. Very simple.
 - However, the JWKS endpoint of the OIDC provider needs to export it to the Internet because AWS try to access the endpoint to obtain the public key and to verify the ID token which is issued by the provider.
+
+### Federation type: OIDC-V2 (with AWS SDK v2)
+
+Use configuration: `oidc-v2` when prompted
 
 ### Federation type: SAML 2.0
 
