@@ -49,5 +49,6 @@ func ConfigPath() string {
 		}
 		path = home + "/.aws-cli-oidc"
 	}
-	return path
+	configdir = path
+	return configdir
 }

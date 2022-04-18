@@ -40,7 +40,7 @@ func (c *AWSCredentials) isValid() bool {
 	input := &sts.GetCallerIdentityInput{}
 	_, err = svc.GetCallerIdentity(input)
 	if err != nil {
-		Writeln("The previous credential isn't valid")
+		Writeln("The previous credential isn't valid, need re-authentication")
 	}
 	return err == nil
 }

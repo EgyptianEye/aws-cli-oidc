@@ -20,7 +20,7 @@ func init() {
 	getCredCmd.Flags().StringP("provider", "p", "", "OIDC provider name")
 	getCredCmd.Flags().StringP("role", "r", "", "Override default assume role ARN")
 	getCredCmd.Flags().Int64P("max-duration", "d", 0, "Override default max session duration, in seconds, of the role session [900-43200]")
-	getCredCmd.Flags().BoolP("use-secret", "s", false, "Store AWS credentials into OS secret store, then load it without re-authentication")
+	getCredCmd.Flags().StringP("use-secret", "s", "", "Store AWS credentials in [keyring] or [file], then load it without re-authentication")
 	getCredCmd.Flags().BoolP("json", "j", false, "Print the credential as JSON format")
 	rootCmd.AddCommand(getCredCmd)
 }
@@ -34,7 +34,7 @@ func getCred(cmd *cobra.Command, args []string) {
 
 	roleArn, _ := cmd.Flags().GetString("role")
 	maxDurationSeconds, _ := cmd.Flags().GetInt64("max-duration")
-	useSecret, _ := cmd.Flags().GetBool("use-secret")
+	useSecret, _ := cmd.Flags().GetString("use-secret")
 	asJson, _ := cmd.Flags().GetBool("json")
 
 	client, err := lib.CheckInstalled(providerName)
@@ -63,19 +63,18 @@ func output(json bool) func(*lib.AWSCredentials, error) error {
 	}
 }
 
-func authenticate(useSecret bool, client *lib.OIDCClient, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
+func authenticate(store string, client *lib.OIDCClient, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
+	useSecret := lib.NewSecret(store) == nil
 	if useSecret {
-		// Try to reuse stored credential in secret
-		cred, err = lib.AWSCredential(roleArn)
+		cred, err = lib.GetStoredAWSCredential(roleArn)
 		if err == nil {
 			return
 		}
 	}
 	cred, err = lib.Authenticate(client, roleArn, maxDurationSeconds)
 	if err == nil && useSecret {
-		// Store into secret
-		lib.SaveAWSCredential(roleArn, cred)
-		lib.Write("The AWS credentials has been saved in OS secret store")
+		lib.StoreAWSCredential(roleArn, cred)
+		lib.Write("The AWS credentials has been saved in " + store)
 	}
 	return
 }
