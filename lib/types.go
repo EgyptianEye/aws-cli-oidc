@@ -49,7 +49,7 @@ func (c *AWSCredentials) JSON() (string, error) {
 	c.Version = 1
 	bs, err := json.Marshal(c)
 	if err != nil {
-		return "", fmt.Errorf("Unexpected AWS credential response: %w", err)
+		return "", fmt.Errorf("unexpected AWS credential response: %w", err)
 	}
 	return string(bs), nil
 }

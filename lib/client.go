@@ -11,9 +11,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-type RESTClient struct {
-	client *RestClient
-}
+// type RESTClient struct {
+// 	client *RestClient
+// }
 
 type OIDCMetadataResponse struct {
 	Issuer                                     string   `json:"issuer"`

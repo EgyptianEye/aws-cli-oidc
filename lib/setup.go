@@ -68,7 +68,7 @@ func RunSetup(ui *input.UI) {
 		Required: false,
 		ValidateFunc: func(s string) error {
 			if strings.ToLower(s) != "false" || strings.ToLower(s) != "true" {
-				return errors.New(fmt.Sprintf("Input must be true or false"))
+				return errors.New("Input must be true or false")
 			}
 			return nil
 		},
@@ -90,7 +90,7 @@ func RunSetup(ui *input.UI) {
 		ValidateFunc: func(s string) error {
 			i, err := strconv.ParseInt(s, 10, 64)
 			if err != nil || i < 900 || i > 43200 {
-				return errors.New(fmt.Sprintf("Input must be 900-43200"))
+				return errors.New("Input must be 900-43200")
 			}
 			return nil
 		},
@@ -109,7 +109,7 @@ func RunSetup(ui *input.UI) {
 					return nil
 				}
 			}
-			return errors.New(fmt.Sprintf("Input must be IAM Role ARN"))
+			return errors.New("Input must be IAM Role ARN")
 		},
 	})
 

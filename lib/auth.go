@@ -29,7 +29,7 @@ func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds 
 	)
 	tokenResponse, err := doLogin(client)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to login the OIDC provider: %w", err)
+		return nil, fmt.Errorf("failed to login the OIDC provider: %w", err)
 	}
 	Writeln("Login successful!")
 	Traceln("ID token: %s", tokenResponse.IDToken)
@@ -46,23 +46,23 @@ func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds 
 	case AWS_FEDERATION_TYPE_OIDC:
 		awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, maxSessionDurationSeconds)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get aws credentials with OIDC: %w", err)
+			return nil, fmt.Errorf("failed to get aws credentials with OIDC: %w", err)
 		}
 	case AWS_FEDERATION_TYPE_SAML2:
 		samlAssertion, err := getSAMLAssertion(client, tokenResponse)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get SAML2 assertion from OIDC provider: %w", err)
+			return nil, fmt.Errorf("failed to get SAML2 assertion from OIDC provider: %w", err)
 		}
 		samlResponse, err := createSAMLResponse(client, samlAssertion)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create SAML Response: %w", err)
+			return nil, fmt.Errorf("failed to create SAML Response: %w", err)
 		}
 		awsCreds, err = GetCredentialsWithSAML(samlResponse, maxSessionDurationSeconds, roleArn)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to get aws credentials with SAML2: %w", err)
+			return nil, fmt.Errorf("failed to get aws credentials with SAML2: %w", err)
 		}
 	default:
-		return nil, fmt.Errorf("Invalid AWS federation type: %s", strings.ToUpper(awsFedType))
+		return nil, fmt.Errorf("invalid AWS federation type: %s", strings.ToUpper(awsFedType))
 	}
 	return awsCreds, nil
 }
@@ -89,6 +89,10 @@ func getSAMLAssertion(client *OIDCClient, tokenResponse *TokenResponse) (string,
 		Request().
 		Form(form).
 		Post()
+
+	if err != nil {
+		return "", fmt.Errorf("error sending client request: %w", err)
+	}
 
 	Traceln("Exchanged SAML assertion response status: %d", res.Status())
 
@@ -172,10 +176,7 @@ func createSAMLResponse(client *OIDCClient, samlAssertion string) (string, error
 	samlp.AddChild(assertionElement)
 
 	// newDoc.WriteTo(os.Stderr)
-
-	samlResponse, err := newDoc.WriteToString()
-
-	return samlResponse, nil
+	return newDoc.WriteToString()
 }
 
 func doLogin(client *OIDCClient) (*TokenResponse, error) {
@@ -230,9 +231,7 @@ func launch(client *OIDCClient, url string, listener net.Listener) string {
 	c := make(chan string)
 
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		url := req.URL
-		q := url.Query()
-		code := q.Get("code")
+		code := req.URL.Query().Get("code")
 
 		res.Header().Set("Content-Type", "text/html")
 
@@ -279,12 +278,13 @@ func launch(client *OIDCClient, url string, listener net.Listener) string {
 	})
 
 	srv := &http.Server{}
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 	defer srv.Shutdown(ctx)
 
 	go func() {
-		if err := srv.Serve(listener); err != nil {
-			// cannot panic, because this probably is an intentional close
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			Exit(fmt.Errorf("error serving http callback: %w", err))
 		}
 	}()
 
@@ -296,20 +296,6 @@ func launch(client *OIDCClient, url string, listener net.Listener) string {
 	return code
 }
 
-func GetFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
-}
-
 func codeToToken(client *OIDCClient, verifier string, code string, redirect string) (*TokenResponse, error) {
 	form := client.ClientForm()
 	form.Set("grant_type", "authorization_code")
@@ -317,7 +303,7 @@ func codeToToken(client *OIDCClient, verifier string, code string, redirect stri
 	form.Set("code_verifier", verifier)
 	form.Set("redirect_uri", redirect)
 
-	Traceln("code2token params:", form)
+	Traceln("code2token params: %+v", form)
 
 	res, err := client.Token().Request().Form(form).Post()
 

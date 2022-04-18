@@ -67,7 +67,7 @@ func NewRestClient(config *RestClientConfig) (*RestClient, error) {
 
 		tlsConfig.Certificates = []tls.Certificate{cert}
 		tlsConfig.RootCAs = caCertPool
-		tlsConfig.BuildNameToCertificate()
+		//tlsConfig.BuildNameToCertificate()
 	}
 
 	tr := &http.Transport{
@@ -109,9 +109,7 @@ func (target *WebTarget) Path(path string) *WebTarget {
 	}
 
 	if strings.HasSuffix(target.url.Path, "/") {
-		if strings.HasPrefix(path, "/") {
-			path = path[1:]
-		}
+		path = strings.TrimPrefix(path, "/")
 	} else {
 		if !strings.HasPrefix(path, "/") {
 			path = "/" + path

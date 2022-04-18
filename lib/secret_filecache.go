@@ -57,14 +57,14 @@ func (sf *FileStore) Save(roleArn, cred string) error {
 	defer sf.Unlock()
 	var c AWSCredentials
 	if err := json.Unmarshal([]byte(cred), &c); err != nil {
-		// TODO
+		return fmt.Errorf("error unmarshalling credentials: %w", err)
 	}
 	sf.cred[roleArn] = &c
 	f, err := os.Create(sf.filepath)
-	defer f.Close()
 	if err != nil {
 		return fmt.Errorf("cannot save credentials for %s: %w", roleArn, err)
 	}
+	defer f.Close()
 	if err := json.NewEncoder(f).Encode(sf.cred); err != nil {
 		return fmt.Errorf("cannot save credentials for %s: %w", roleArn, err)
 	}

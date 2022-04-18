@@ -74,12 +74,12 @@ func (s *KeyringStore) Load() {
 func (s *KeyringStore) Get(roleArn string) (*AWSCredentials, error) {
 	jsonStr, ok := s.AWSCredentials[roleArn]
 	if !ok {
-		return nil, fmt.Errorf("Not found the credential for %s", roleArn)
+		return nil, fmt.Errorf("not found the credential for %s", roleArn)
 	}
 	Writeln("Got credential from OS secret store for %s", roleArn)
 	var cred AWSCredentials
 	if err := json.Unmarshal([]byte(jsonStr), &cred); err != nil {
-		return nil, fmt.Errorf("Can't load secret due to the broken data: %w", err)
+		return nil, fmt.Errorf("can't load secret due to the broken data: %w", err)
 	}
 	return &cred, nil
 }
@@ -87,12 +87,12 @@ func (s *KeyringStore) Get(roleArn string) (*AWSCredentials, error) {
 func (s *KeyringStore) Save(roleArn, cred string) error {
 	acquired, lock, err := s.locker.Acquire(s.lockResource, lockgate.AcquireOptions{Shared: false, Timeout: 3 * time.Minute})
 	if err != nil {
-		return fmt.Errorf("Can't save secret due to locked now: %w", err)
+		return fmt.Errorf("can't save secret due to locked now: %w", err)
 	}
 	defer func() {
 		if acquired {
 			if err := s.locker.Release(lock); err != nil {
-				Exit(errors.New("Can't unlock"))
+				Exit(errors.New("can't unlock"))
 			}
 		}
 	}()
@@ -100,12 +100,12 @@ func (s *KeyringStore) Save(roleArn, cred string) error {
 	jsonStr, err := keyring.Get(s.service, s.user)
 	if err != nil {
 		if err != keyring.ErrNotFound {
-			Exit(fmt.Errorf("Can't load secret due to unexpected error: %w", err))
+			Exit(fmt.Errorf("can't load secret due to unexpected error: %w", err))
 		}
 	}
 	if jsonStr != "" {
 		if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
-			return fmt.Errorf("Can't load secret due to broken data: %w", err)
+			return fmt.Errorf("can't load secret due to broken data: %w", err)
 		}
 	}
 	// Add/Update credential
@@ -113,10 +113,10 @@ func (s *KeyringStore) Save(roleArn, cred string) error {
 	// Save
 	newJsonStr, err := json.Marshal(s)
 	if err != nil {
-		return fmt.Errorf("Can't marshal data: %w", err)
+		return fmt.Errorf("can't marshal data: %w", err)
 	}
 	if err := keyring.Set(s.service, s.user, string(newJsonStr)); err != nil {
-		return fmt.Errorf("Can't save secret: %w", err)
+		return fmt.Errorf("can't save secret: %w", err)
 	}
 	return nil
 }

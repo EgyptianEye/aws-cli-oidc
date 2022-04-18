@@ -42,7 +42,7 @@ func GetStoredAWSCredential(roleArn string) (*AWSCredentials, error) {
 func StoreAWSCredential(roleArn string, cred *AWSCredentials) error {
 	js, err := json.Marshal(cred)
 	if err != nil {
-		return fmt.Errorf("Can't save secret due to the malformed data: %w", err)
+		return fmt.Errorf("can't save secret due to the malformed data: %w", err)
 	}
 	return secret.Save(roleArn, string(js))
 }
