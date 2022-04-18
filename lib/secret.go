@@ -15,12 +15,13 @@ type SecretStore interface {
 
 var secret SecretStore = defaultstore{}
 
-func NewSecret(typ string) error {
+// InitializeSecret prepares store of type for the given provider
+func InitializeSecret(typ, provider string) error {
 	switch typ {
 	case "keyring", "Keyring", "KEYRING":
-		secret = NewKeyringStore()
+		secret = NewKeyringStore(provider)
 	case "file", "File", "FILE":
-		secret = NewFileStore()
+		secret = NewFileStore(provider)
 	default:
 		return errors.New("invalid type for credential store: " + typ)
 	}
@@ -47,7 +48,7 @@ func StoreAWSCredential(roleArn string, cred *AWSCredentials) error {
 	return secret.Save(roleArn, string(js))
 }
 
-func Clear() error {
+func ClearSecret() error {
 	return secret.Clear()
 }
 

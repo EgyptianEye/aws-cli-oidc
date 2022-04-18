@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,12 +15,13 @@ type FileStore struct {
 	cred     map[string]*AWSCredentials
 }
 
-func NewFileStore() *FileStore {
-	path := filepath.Join(ConfigPath(), "cache")
+func NewFileStore(provider string) *FileStore {
+	encoded := hex.EncodeToString([]byte(provider))
+	path := filepath.Join(ConfigPath(), encoded)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		f, err1 := os.Create(path)
 		if err1 != nil {
-			Exit(fmt.Errorf("cannot create secret file %s: %w", path, err1))
+			Exit(fmt.Errorf("cannot create credential file %s for provider %s: %w", path, provider, err1))
 		}
 		f.WriteString("{}\n")
 		f.Close()

@@ -21,7 +21,7 @@ type KeyringStore struct {
 	AWSCredentials map[string]string `json:"credentials"`
 }
 
-func NewKeyringStore() *KeyringStore {
+func NewKeyringStore(provider string) *KeyringStore {
 	dir := filepath.Join(os.TempDir(), "aws-cli-oidc-lock")
 	l, err := file_locker.NewFileLocker(dir)
 	if err != nil {
@@ -32,7 +32,7 @@ func NewKeyringStore() *KeyringStore {
 		locker:         l,
 		lockResource:   "aws-cli-oidc",
 		user:           os.Getenv("USER"),
-		service:        "aws-cli-oidc",
+		service:        "aws-cli-oidc/" + provider,
 		AWSCredentials: make(map[string]string),
 	}
 	return s

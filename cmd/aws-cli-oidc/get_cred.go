@@ -28,21 +28,14 @@ func init() {
 func getCred(cmd *cobra.Command, args []string) {
 	providerName, _ := cmd.Flags().GetString("provider")
 	if providerName == "" {
-		lib.Writeln("The OIDC provider name is required")
-		lib.Exit(nil)
+		lib.Exit(errors.New("the OIDC provider name is required"))
 	}
-
 	roleArn, _ := cmd.Flags().GetString("role")
 	maxDurationSeconds, _ := cmd.Flags().GetInt64("max-duration")
 	useSecret, _ := cmd.Flags().GetString("use-secret")
 	asJson, _ := cmd.Flags().GetBool("json")
 
-	client, err := lib.CheckInstalled(providerName)
-	if err != nil {
-		lib.Exit(errors.New("Failed to login OIDC provider"))
-	}
-
-	lib.Exit(output(asJson)(authenticate(useSecret, client, roleArn, maxDurationSeconds)))
+	lib.Exit(output(asJson)(authenticate(useSecret, providerName, roleArn, maxDurationSeconds)))
 }
 
 func output(json bool) func(*lib.AWSCredentials, error) error {
@@ -63,13 +56,17 @@ func output(json bool) func(*lib.AWSCredentials, error) error {
 	}
 }
 
-func authenticate(store string, client *lib.OIDCClient, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
-	useSecret := lib.NewSecret(store) == nil
+func authenticate(store, provider, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
+	useSecret := lib.InitializeSecret(store, provider) == nil
 	if useSecret {
 		cred, err = lib.GetStoredAWSCredential(roleArn)
 		if err == nil {
 			return
 		}
+	}
+	client, err := lib.CheckInstalled(provider)
+	if err != nil {
+		lib.Exit(fmt.Errorf("failed to login via OIDC provider %s", provider))
 	}
 	cred, err = lib.Authenticate(client, roleArn, maxDurationSeconds)
 	if err == nil && useSecret {
