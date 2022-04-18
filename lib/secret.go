@@ -7,7 +7,7 @@ import (
 )
 
 type SecretStore interface {
-	Load()
+	Load() error
 	Get(string) (*AWSCredentials, error)
 	Save(string, string) error
 	Clear() error
@@ -29,7 +29,9 @@ func InitializeSecret(typ, provider string) error {
 }
 
 func GetStoredAWSCredential(roleArn string) (*AWSCredentials, error) {
-	secret.Load()
+	if err := secret.Load(); err != nil {
+		return nil, err
+	}
 	cred, err := secret.Get(roleArn)
 	if err != nil {
 		return nil, err
@@ -54,13 +56,17 @@ func ClearSecret() error {
 
 type defaultstore struct{}
 
-func (defaultstore) Load() {}
+var errUnimplemented = errors.New("not implemented")
+
+func (defaultstore) Load() error {
+	return errUnimplemented
+}
 func (defaultstore) Get(string) (*AWSCredentials, error) {
-	return nil, errors.New("not implemented")
+	return nil, errUnimplemented
 }
 func (defaultstore) Save(string, string) error {
-	return errors.New("not implemented")
+	return errUnimplemented
 }
 func (defaultstore) Clear() error {
-	return errors.New("not implemented")
+	return errUnimplemented
 }

@@ -38,37 +38,33 @@ func NewKeyringStore(provider string) *KeyringStore {
 	return s
 }
 
-func (s *KeyringStore) Load() {
+func (s *KeyringStore) Load() error {
 	acquired, lock, err := s.locker.Acquire(s.lockResource, lockgate.AcquireOptions{Shared: false, Timeout: 3 * time.Minute})
 	if err != nil {
-		Writeln("Can't load secret due to locked now")
-		Exit(err)
+		return fmt.Errorf("can't load secret due to locked now: %w", err)
 	}
 	defer func() {
 		if acquired {
 			if err := s.locker.Release(lock); err != nil {
-				Writeln("Can't unlock")
-				Exit(err)
+				Exit(fmt.Errorf("can't unlock: %w", err))
 			}
 		}
 	}()
 	if !acquired {
-		Writeln("Can't load secret due to locked now")
-		Exit(err)
+		return fmt.Errorf("can't load secret due to locked now: %w", err)
 	}
 
 	jsonStr, err := keyring.Get(s.service, s.user)
 	if err != nil {
 		if err == keyring.ErrNotFound {
-			return
+			return nil
 		}
-		Writeln("Can't load secret due to unexpected error: %v", err)
-		Exit(err)
+		return fmt.Errorf("can't load secret due to unexpected error: %w", err)
 	}
 	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
-		Writeln("Can't load secret due to broken data: %v", err)
-		Exit(err)
+		return fmt.Errorf("can't load secret due to broken data: %w", err)
 	}
+	return nil
 }
 
 func (s *KeyringStore) Get(roleArn string) (*AWSCredentials, error) {

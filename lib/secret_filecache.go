@@ -29,18 +29,18 @@ func NewFileStore(provider string) *FileStore {
 	return &FileStore{filepath: path, cred: make(map[string]*AWSCredentials)}
 }
 
-func (sf *FileStore) Load() {
+func (sf *FileStore) Load() error {
 	sf.Lock()
 	defer sf.Unlock()
 	f, err := os.Open(sf.filepath)
 	if err != nil {
-		Exit(fmt.Errorf("cannot open secret file %s: %w", sf.filepath, err))
+		return fmt.Errorf("cannot open secret file %s: %w", sf.filepath, err)
 	}
 	if err := json.NewDecoder(f).Decode(&sf.cred); err != nil {
-		err1 := fmt.Errorf("warning: cannot decode secrect file %s: %w", sf.filepath, err)
-		fmt.Fprintln(os.Stderr, err1)
+		return fmt.Errorf("warning: cannot decode secrect file %s: %w", sf.filepath, err)
 	}
 	f.Close()
+	return nil
 }
 
 func (sf *FileStore) Get(roleArn string) (*AWSCredentials, error) {
