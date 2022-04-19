@@ -24,9 +24,9 @@ func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn string, dura
 	svc := sts.New(sess)
 
 	params := &sts.AssumeRoleWithWebIdentityInput{
-		RoleArn:          &iamRoleArn,
-		RoleSessionName:  &roleSessionName,
-		WebIdentityToken: &idToken,
+		RoleArn:          aws.String(iamRoleArn),
+		RoleSessionName:  aws.String(roleSessionName),
+		WebIdentityToken: aws.String(idToken),
 		DurationSeconds:  aws.Int64(durationInSeconds),
 	}
 
