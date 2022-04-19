@@ -14,42 +14,32 @@ import (
 	pkce "github.com/nirasan/go-oauth-pkce-code-verifier"
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
+	"github.com/spf13/viper"
 )
 
-func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds int64) (*AWSCredentials, error) {
-	conf := client.config
-	// Resolve target IAM Role ARN
-	defaultIAMRoleArn := conf.GetString(DEFAULT_IAM_ROLE_ARN)
-	if roleArn == "" {
-		roleArn = defaultIAMRoleArn
-	}
+func Authenticate(client *OIDCClient, config *viper.Viper) (*AWSCredentials, error) {
+	roleArn := config.GetString(IAM_ROLE_ARN)
+	maxSessionDurationSeconds, _ := strconv.ParseInt(config.GetString(MAX_SESSION_DURATION_SECONDS), 10, 64)
+	roleSessName := config.GetString(AWS_FEDERATION_ROLE_SESSION_NAME)
 	var (
 		awsCreds *AWSCredentials
 		err      error
 	)
-	tokenResponse, err := doLogin(client)
+	tokenResponse, err := doLogin(client, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to login the OIDC provider: %w", err)
 	}
 	Writeln("Login successful!")
 	Traceln("ID token: %s", tokenResponse.IDToken)
-	awsFedType := conf.GetString(AWS_FEDERATION_TYPE)
-	// Resolve max duration
-	if maxSessionDurationSeconds <= 0 {
-		maxSessionDurationSecondsString := conf.GetString(MAX_SESSION_DURATION_SECONDS)
-		maxSessionDurationSeconds, err = strconv.ParseInt(maxSessionDurationSecondsString, 10, 64)
-		if err != nil {
-			maxSessionDurationSeconds = 3600
-		}
-	}
+	awsFedType := config.GetString(AWS_FEDERATION_TYPE)
 	switch awsFedType {
 	case AWS_FEDERATION_TYPE_OIDC:
-		awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, maxSessionDurationSeconds)
+		awsCreds, err = GetCredentialsWithOIDC(client, tokenResponse.IDToken, roleArn, roleSessName, maxSessionDurationSeconds)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get aws credentials with OIDC: %w", err)
 		}
 	case AWS_FEDERATION_TYPE_SAML2:
-		samlAssertion, err := getSAMLAssertion(client, tokenResponse)
+		samlAssertion, err := getSAMLAssertion(client, config, tokenResponse)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get SAML2 assertion from OIDC provider: %w", err)
 		}
@@ -67,9 +57,9 @@ func Authenticate(client *OIDCClient, roleArn string, maxSessionDurationSeconds 
 	return awsCreds, nil
 }
 
-func getSAMLAssertion(client *OIDCClient, tokenResponse *TokenResponse) (string, error) {
-	audience := client.config.GetString(OIDC_PROVIDER_TOKEN_EXCHANGE_AUDIENCE)
-	subjectTokenType := client.config.GetString(OIDC_PROVIDER_TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE)
+func getSAMLAssertion(client *OIDCClient, config *viper.Viper, tokenResponse *TokenResponse) (string, error) {
+	audience := config.GetString(OIDC_PROVIDER_TOKEN_EXCHANGE_AUDIENCE)
+	subjectTokenType := config.GetString(OIDC_PROVIDER_TOKEN_EXCHANGE_SUBJECT_TOKEN_TYPE)
 
 	var subjectToken string
 	if subjectTokenType == TOKEN_TYPE_ID_TOKEN {
@@ -179,14 +169,14 @@ func createSAMLResponse(client *OIDCClient, samlAssertion string) (string, error
 	return newDoc.WriteToString()
 }
 
-func doLogin(client *OIDCClient) (*TokenResponse, error) {
+func doLogin(client *OIDCClient, config *viper.Viper) (*TokenResponse, error) {
 	listener, err := net.Listen("tcp", "127.0.0.1:")
 	if err != nil {
 		return nil, errors.Wrap(err, "Cannot start local http server to handle login redirect")
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 
-	clientId := client.config.GetString(CLIENT_ID)
+	clientId := config.GetString(CLIENT_ID)
 	redirect := fmt.Sprintf("http://127.0.0.1:%d", port)
 	v, err := pkce.CreateCodeVerifierWithLength(pkce.MaxLength)
 	if err != nil {
@@ -203,7 +193,7 @@ func doLogin(client *OIDCClient) (*TokenResponse, error) {
 		QueryParam("code_challenge_method", "S256").
 		QueryParam("scope", "openid")
 
-	additionalQuery := client.config.GetString(OIDC_AUTHENTICATION_REQUEST_ADDITIONAL_QUERY)
+	additionalQuery := config.GetString(OIDC_AUTHENTICATION_REQUEST_ADDITIONAL_QUERY)
 	if additionalQuery != "" {
 		queries := strings.Split(additionalQuery, "&")
 		for _, q := range queries {

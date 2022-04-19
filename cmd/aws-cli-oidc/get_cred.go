@@ -7,6 +7,7 @@ import (
 
 	"github.com/openstandia/aws-cli-oidc/lib"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var getCredCmd = &cobra.Command{
@@ -31,11 +32,11 @@ func getCred(cmd *cobra.Command, args []string) {
 		lib.Exit(errors.New("the OIDC provider name is required"))
 	}
 	roleArn, _ := cmd.Flags().GetString("role")
-	maxDurationSeconds, _ := cmd.Flags().GetInt64("max-duration")
+	maxDurationSeconds, _ := cmd.Flags().GetString("max-duration")
 	useSecret, _ := cmd.Flags().GetString("use-secret")
 	asJson, _ := cmd.Flags().GetBool("json")
 
-	lib.Exit(output(asJson)(authenticate(useSecret, providerName, roleArn, maxDurationSeconds)))
+	lib.Exit(output(asJson)(authenticate(useSecret, lib.MergedConfig(providerName, roleArn, maxDurationSeconds))))
 }
 
 func output(json bool) func(*lib.AWSCredentials, error) error {
@@ -56,19 +57,20 @@ func output(json bool) func(*lib.AWSCredentials, error) error {
 	}
 }
 
-func authenticate(store, provider, roleArn string, maxDurationSeconds int64) (cred *lib.AWSCredentials, err error) {
-	useSecret := lib.InitializeSecret(store, provider) == nil
+func authenticate(store string, config *viper.Viper) (cred *lib.AWSCredentials, err error) {
+	roleArn := config.GetString(lib.IAM_ROLE_ARN)
+	useSecret := lib.InitializeSecret(store, config.GetString(lib.IdP)) == nil
 	if useSecret {
 		cred, err = lib.GetStoredAWSCredential(roleArn)
 		if err == nil {
 			return
 		}
 	}
-	client, err := lib.CheckInstalled(provider)
+	client, err := lib.InitializeClient(config)
 	if err != nil {
-		lib.Exit(fmt.Errorf("failed to login via OIDC provider %s", provider))
+		lib.Exit(err)
 	}
-	cred, err = lib.Authenticate(client, roleArn, maxDurationSeconds)
+	cred, err = lib.Authenticate(client, config)
 	if err == nil && useSecret {
 		lib.StoreAWSCredential(roleArn, cred)
 		lib.Write("The AWS credentials has been saved in " + store)

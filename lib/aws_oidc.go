@@ -7,13 +7,11 @@ import (
 	"github.com/pkg/errors"
 )
 
-func GetCredentialsWithOIDC(client *OIDCClient, idToken, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
-	return loginToStsUsingIDToken(client, idToken, iamRoleArn, durationInSeconds)
+func GetCredentialsWithOIDC(client *OIDCClient, idToken, iamRoleArn, roleSessionName string, durationInSeconds int64) (*AWSCredentials, error) {
+	return loginToStsUsingIDToken(client, idToken, iamRoleArn, roleSessionName, durationInSeconds)
 }
 
-func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn string, durationInSeconds int64) (*AWSCredentials, error) {
-	roleSessionName := client.config.GetString(AWS_FEDERATION_ROLE_SESSION_NAME)
-
+func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn, roleSessionName string, durationInSeconds int64) (*AWSCredentials, error) {
 	sess, err := session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	})

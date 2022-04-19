@@ -1,9 +1,12 @@
 package lib
 
 import (
+	"errors"
 	"os"
+	"strconv"
 
 	"github.com/mitchellh/go-homedir"
+	"github.com/spf13/viper"
 )
 
 const OIDC_PROVIDER_METADATA_URL = "oidc_provider_metadata_url"
@@ -18,7 +21,8 @@ const CLIENT_AUTH_CA = "client_auth_ca"
 const INSECURE_SKIP_VERIFY = "insecure_skip_verify"
 const AWS_FEDERATION_TYPE = "aws_federation_type"
 const MAX_SESSION_DURATION_SECONDS = "max_session_duration_seconds"
-const DEFAULT_IAM_ROLE_ARN = "default_iam_role_arn"
+const IAM_ROLE_ARN = "iam_role_arn"
+const IdP = "identity_provider"
 
 // OIDC config
 const AWS_FEDERATION_ROLE_SESSION_NAME = "aws_federation_role_session_name"
@@ -51,4 +55,22 @@ func ConfigPath() string {
 	}
 	configdir = path
 	return configdir
+}
+
+func MergedConfig(provider, roleArn, maxSessionDuration string) *viper.Viper {
+	if viper.Sub(provider) == nil {
+		setupOIDCProvider(provider)
+	}
+	conf := viper.Sub(provider)
+	if conf == nil {
+		Exit(errors.New("failed to setup configuration"))
+	}
+	if roleArn != "" {
+		conf.Set(IAM_ROLE_ARN, roleArn)
+	}
+	conf.SetDefault(MAX_SESSION_DURATION_SECONDS, "3600")
+	if i, err := strconv.ParseInt(maxSessionDuration, 10, 64); err == nil && i >= 900 && i <= 43200 {
+		conf.Set(MAX_SESSION_DURATION_SECONDS, maxSessionDuration)
+	}
+	return conf
 }

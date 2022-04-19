@@ -3,6 +3,7 @@ package lib
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -11,138 +12,172 @@ import (
 	"github.com/spf13/viper"
 )
 
-func RunSetup(ui *input.UI) {
-	if ui == nil {
-		ui = &input.UI{
-			Writer: os.Stdout,
-			Reader: os.Stdin,
-		}
-	}
+const NoDepKey string = ""
 
-	providerName, _ := ui.Ask("OIDC provider name:", &input.Options{
-		Required: true,
-		Loop:     true,
-	})
-	server, _ := ui.Ask("OIDC provider metadata URL (https://your-oidc-provider/.well-known/openid-configuration):", &input.Options{
-		Required: true,
-		Loop:     true,
-	})
-	additionalQuery, _ := ui.Ask("Additional query for OIDC authentication request (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-	})
-	successfulRedirectURL, _ := ui.Ask("Successful redirect URL (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-	})
-	failureRedirectURL, _ := ui.Ask("Failure redirect URL (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-	})
-	clientID, _ := ui.Ask("Client ID which is registered in the OIDC provider:", &input.Options{
-		Required: true,
-		Loop:     true,
-	})
-	clientSecret, _ := ui.Ask("Client secret which is registered in the OIDC provider (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-	})
-	clientAuthCert, _ := ui.Ask("A PEM encoded certificate file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-	})
-	var clientAuthKey string
-	var clientAuthCA string
-	if clientAuthCert != "" {
-		clientAuthKey, _ = ui.Ask("A PEM encoded private key file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
+type setup struct {
+	key    string
+	dep    string
+	getter func(ui *input.UI) (string, error)
+}
+
+var steps []setup = []setup{
+	{IdP, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Identity provider name:", &input.Options{
 			Required: true,
 			Loop:     true,
 		})
-		clientAuthCA, _ = ui.Ask("A PEM encoded CA's certificate file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
+	}},
+	{OIDC_PROVIDER_METADATA_URL, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("OIDC provider metadata URL (https://your-oidc-provider/.well-known/openid-configuration):", &input.Options{
 			Required: true,
 			Loop:     true,
 		})
-	}
-	insecureSkipVerify, _ := ui.Ask("Insecure mode for HTTPS access (Default: false):", &input.Options{
-		Default:  "false",
-		Required: false,
-		ValidateFunc: func(s string) error {
-			if strings.ToLower(s) != "false" || strings.ToLower(s) != "true" {
-				return errors.New("Input must be true or false")
-			}
-			return nil
-		},
-	})
-	answerFedType, _ := ui.Ask(fmt.Sprintf("Choose type of AWS federation [%s/%s]:", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_SAML2), &input.Options{
-		Required: true,
-		Loop:     true,
-		ValidateFunc: func(s string) error {
-			if s != AWS_FEDERATION_TYPE_SAML2 && s != AWS_FEDERATION_TYPE_OIDC {
-				return errors.New(fmt.Sprintf("Input must be '%s' or '%s'", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_SAML2))
-			}
-			return nil
-		},
-	})
-	maxSessionDurationSeconds, _ := ui.Ask("The max session duration, in seconds, of the role session [900-43200] (Default: 3600):", &input.Options{
-		Default:  "3600",
-		Required: true,
-		Loop:     true,
-		ValidateFunc: func(s string) error {
-			i, err := strconv.ParseInt(s, 10, 64)
-			if err != nil || i < 900 || i > 43200 {
-				return errors.New("Input must be 900-43200")
-			}
-			return nil
-		},
-	})
-	defaultIAMRoleArn, _ := ui.Ask("The default IAM Role ARN when you have multiple roles, as arn:aws:iam::<account-id>:role/<role-name> (Default: none):", &input.Options{
-		Default:  "",
-		Required: false,
-		Loop:     true,
-		ValidateFunc: func(s string) error {
-			if s == "" {
+	}},
+	{OIDC_AUTHENTICATION_REQUEST_ADDITIONAL_QUERY, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Additional query for OIDC authentication request (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+		})
+	}},
+	{SUCCESSFUL_REDIRECT_URL, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Successful redirect URL (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+		})
+	}},
+	{FAILURE_REDIRECT_URL, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Failure redirect URL (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+		})
+	}},
+	{CLIENT_ID, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Client ID which is registered in the OIDC provider:", &input.Options{
+			Required: true,
+			Loop:     true,
+		})
+	}},
+	{CLIENT_SECRET, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Client secret which is registered in the OIDC provider (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+		})
+	}},
+	{INSECURE_SKIP_VERIFY, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("Insecure mode for HTTPS access (Default: false):", &input.Options{
+			Default:  "false",
+			Required: false,
+			ValidateFunc: func(s string) error {
+				if strings.ToLower(s) != "false" || strings.ToLower(s) != "true" {
+					return errors.New("Input must be true or false")
+				}
 				return nil
-			}
-			arn := strings.Split(s, ":")
-			if len(arn) == 6 {
-				if arn[0] == "arn" && strings.HasPrefix(arn[1], "aws") && arn[2] == "iam" && arn[3] == "" && strings.HasPrefix(arn[5], "role/") {
+			},
+		})
+	}},
+	{AWS_FEDERATION_TYPE, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask(fmt.Sprintf("Choose type of AWS federation [%s/%s]:", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_SAML2), &input.Options{
+			Required: true,
+			Loop:     true,
+			ValidateFunc: func(s string) error {
+				if s != AWS_FEDERATION_TYPE_SAML2 && s != AWS_FEDERATION_TYPE_OIDC {
+					return errors.New(fmt.Sprintf("Input must be '%s' or '%s'", AWS_FEDERATION_TYPE_OIDC, AWS_FEDERATION_TYPE_SAML2))
+				}
+				return nil
+			},
+		})
+	}},
+	{MAX_SESSION_DURATION_SECONDS, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("The max session duration, in seconds, of the role session [900-43200] (Default: 3600):", &input.Options{
+			Default:  "3600",
+			Required: true,
+			Loop:     true,
+			ValidateFunc: func(s string) error {
+				i, err := strconv.ParseInt(s, 10, 64)
+				if err != nil || i < 900 || i > 43200 {
+					return errors.New("Input must be 900-43200")
+				}
+				return nil
+			},
+		})
+	}},
+	{IAM_ROLE_ARN, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("The default IAM Role ARN when you have multiple roles, as arn:aws:iam::<account-id>:role/<role-name> (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+			Loop:     true,
+			ValidateFunc: func(s string) error {
+				if s == "" {
 					return nil
 				}
-			}
-			return errors.New("Input must be IAM Role ARN")
-		},
-	})
+				arn := strings.Split(s, ":")
+				if len(arn) == 6 {
+					if arn[0] == "arn" && strings.HasPrefix(arn[1], "aws") && arn[2] == "iam" && arn[3] == "" && strings.HasPrefix(arn[5], "role/") {
+						return nil
+					}
+				}
+				return errors.New("Input must be IAM Role ARN")
+			},
+		})
+	}},
+	{CLIENT_AUTH_CERT, NoDepKey, func(ui *input.UI) (string, error) {
+		return ui.Ask("A PEM encoded certificate file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
+			Default:  "",
+			Required: false,
+		})
+	}},
+	{CLIENT_AUTH_KEY, CLIENT_AUTH_CERT, func(ui *input.UI) (string, error) {
+		return ui.Ask("A PEM encoded private key file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
+			Required: true,
+			Loop:     true,
+		})
+	}},
+	{CLIENT_AUTH_CA, CLIENT_AUTH_CERT, func(ui *input.UI) (string, error) {
+		return ui.Ask("A PEM encoded CA's certificate file which is required to access the OIDC provider with MTLS (Default: none):", &input.Options{
+			Required: true,
+			Loop:     true,
+		})
+	}},
+}
 
-	config := map[string]string{}
+func RunSetup(ui *input.UI) {
+	if ui == nil {
+		ui = input.DefaultUI()
+	}
+	config := make(map[string]interface{})
 
-	config[OIDC_PROVIDER_METADATA_URL] = server
-	config[OIDC_AUTHENTICATION_REQUEST_ADDITIONAL_QUERY] = additionalQuery
-	config[SUCCESSFUL_REDIRECT_URL] = successfulRedirectURL
-	config[FAILURE_REDIRECT_URL] = failureRedirectURL
-	config[CLIENT_ID] = clientID
-	config[CLIENT_SECRET] = clientSecret
-	config[CLIENT_AUTH_CERT] = clientAuthCert
-	config[CLIENT_AUTH_KEY] = clientAuthKey
-	config[CLIENT_AUTH_CA] = clientAuthCA
-	config[INSECURE_SKIP_VERIFY] = insecureSkipVerify
-	config[AWS_FEDERATION_TYPE] = answerFedType
-	config[MAX_SESSION_DURATION_SECONDS] = maxSessionDurationSeconds
-	config[DEFAULT_IAM_ROLE_ARN] = defaultIAMRoleArn
+	for _, step := range steps {
+		if v, ok := config[step.dep]; step.dep != NoDepKey && (!ok || v == "") {
+			// has dependent key but not found (default value treat as unset)
+			// XXX: use func to verify
+			continue
+		}
+		value, err := step.getter(ui)
+		if err != nil {
+			Writeln("error setting up: %s", err)
+			return
+		}
+		config[step.key] = value
+	}
 
-	if answerFedType == AWS_FEDERATION_TYPE_OIDC {
+	if config[AWS_FEDERATION_TYPE] == AWS_FEDERATION_TYPE_OIDC {
 		oidcSetup(ui, config)
-	} else if answerFedType == AWS_FEDERATION_TYPE_SAML2 {
+	} else if config[AWS_FEDERATION_TYPE] == AWS_FEDERATION_TYPE_SAML2 {
 		saml2Setup(ui, config)
 	}
 
-	viper.Set(providerName, config)
+	k := config[IdP].(string)
+	if c := viper.Sub(k); c != nil {
+		c.MergeConfigMap(config)
+	} else {
+		viper.Set(k, config)
+	}
 
 	os.MkdirAll(ConfigPath(), 0700)
-	configPath := ConfigPath() + "/config.yaml"
+	configPath := filepath.Join(ConfigPath(), "config.yaml")
 	viper.SetConfigFile(configPath)
-	err := viper.WriteConfig()
 
-	if err != nil {
+	if err := viper.WriteConfig(); err != nil {
 		Writeln("Failed to write %s", configPath)
 		Exit(err)
 	}
@@ -150,7 +185,46 @@ func RunSetup(ui *input.UI) {
 	Writeln("Saved %s", configPath)
 }
 
-func oidcSetup(ui *input.UI, config map[string]string) {
+// runSetup is a special case, which provider is already supplied
+func runSetup(ui *input.UI, provider string) {
+	if ui == nil {
+		ui = input.DefaultUI()
+	}
+	config := make(map[string]interface{})
+	for _, step := range steps[1:] { // skip IdP setup
+		if v, ok := config[step.dep]; step.dep != NoDepKey && (!ok || v == "") {
+			continue
+		}
+		value, err := step.getter(ui)
+		if err != nil {
+			Writeln("error setting up: %s", err)
+			return
+		}
+		config[step.key] = value
+	}
+	config[IdP] = provider
+	switch config[AWS_FEDERATION_TYPE] {
+	case AWS_FEDERATION_TYPE_OIDC:
+		oidcSetup(ui, config)
+	case AWS_FEDERATION_TYPE_SAML2:
+		saml2Setup(ui, config)
+	}
+	if c := viper.Sub(provider); c != nil {
+		c.MergeConfigMap(config)
+	} else {
+		viper.Set(provider, config)
+	}
+	os.MkdirAll(ConfigPath(), 0700)
+	configPath := filepath.Join(ConfigPath(), "config.yaml")
+	viper.SetConfigFile(configPath)
+	if err := viper.WriteConfig(); err != nil {
+		Writeln("Failed to write %s", configPath)
+		Exit(err)
+	}
+	Writeln("Saved %s for %s", configPath, provider)
+}
+
+func oidcSetup(ui *input.UI, config map[string]interface{}) {
 	awsRoleSessionName, _ := ui.Ask("AWS federation roleSessionName:", &input.Options{
 		Required: true,
 		Loop:     true,
@@ -158,7 +232,7 @@ func oidcSetup(ui *input.UI, config map[string]string) {
 	config[AWS_FEDERATION_ROLE_SESSION_NAME] = awsRoleSessionName
 }
 
-func saml2Setup(ui *input.UI, config map[string]string) {
+func saml2Setup(ui *input.UI, config map[string]interface{}) {
 	answer, _ := ui.Ask(`Select the subject token type to exchange for SAML2 assertion:
 	1. Access Token (urn:ietf:params:oauth:token-type:access_token)
 	2. ID Token (urn:ietf:params:oauth:token-type:id_token)
@@ -185,4 +259,28 @@ func saml2Setup(ui *input.UI, config map[string]string) {
 		Loop:     true,
 	})
 	config[OIDC_PROVIDER_TOKEN_EXCHANGE_AUDIENCE] = audience
+}
+
+func setupOIDCProvider(name string) {
+	ui := input.DefaultUI()
+	answer, err := ui.Ask(
+		fmt.Sprintf("Do you want to setup the configuration for identity provider \"%s\"? [Y/n]", name),
+		&input.Options{
+			Default: "Y",
+			Loop:    true,
+			ValidateFunc: func(s string) error {
+				if s != "Y" && s != "n" {
+					return errors.New("Input must be Y or n")
+				}
+				return nil
+			},
+		},
+	)
+	switch {
+	case err != nil:
+		Exit(fmt.Errorf("failed to initialize setup: %w", err))
+	case answer == "n":
+		Exit(nil)
+	}
+	runSetup(ui, name)
 }

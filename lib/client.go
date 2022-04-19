@@ -2,12 +2,10 @@ package lib
 
 import (
 	"net/url"
-	"os"
 	"strconv"
 
 	"github.com/pkg/errors"
 
-	input "github.com/natsukagami/go-input"
 	"github.com/spf13/viper"
 )
 
@@ -45,39 +43,16 @@ type OIDCMetadataResponse struct {
 }
 
 type OIDCClient struct {
-	restClient *RestClient
-	base       *WebTarget
-	config     *viper.Viper
-	metadata   *OIDCMetadataResponse
+	restClient   *RestClient
+	base         *WebTarget
+	metadata     *OIDCMetadataResponse
+	clientId     string
+	clientSecret string
+	successURL   string
+	failureURL   string
 }
 
-func CheckInstalled(name string) (*OIDCClient, error) {
-	ui := &input.UI{
-		Writer: os.Stdout,
-		Reader: os.Stdin,
-	}
-
-	return InitializeClient(ui, name)
-}
-
-func InitializeClient(ui *input.UI, name string) (*OIDCClient, error) {
-	config := viper.Sub(name)
-	if config == nil {
-		answer, _ := ui.Ask("OIDC provider URL is not set. Do you want to setup the configuration? [Y/n]", &input.Options{
-			Default: "Y",
-			Loop:    true,
-			ValidateFunc: func(s string) error {
-				if s != "Y" && s != "n" {
-					return errors.New("Input must be Y or n")
-				}
-				return nil
-			},
-		})
-		if answer == "n" {
-			return nil, errors.New("Failed to initialize client because of no OIDC provider URL")
-		}
-		RunSetup(ui)
-	}
+func InitializeClient(config *viper.Viper) (*OIDCClient, error) {
 	providerURL := config.GetString(OIDC_PROVIDER_METADATA_URL)
 	insecure, err := strconv.ParseBool(config.GetString(INSECURE_SKIP_VERIFY))
 	if err != nil {
@@ -118,7 +93,15 @@ func InitializeClient(ui *input.UI, name string) (*OIDCClient, error) {
 		return nil, errors.Wrap(err, "Failed to parse OIDC metadata response")
 	}
 
-	client := &OIDCClient{restClient, base, config, metadata}
+	client := &OIDCClient{
+		restClient,
+		base,
+		metadata,
+		config.GetString(CLIENT_ID),
+		config.GetString(CLIENT_SECRET),
+		config.GetString(SUCCESSFUL_REDIRECT_URL),
+		config.GetString(FAILURE_REDIRECT_URL),
+	}
 
 	if base == nil {
 		return nil, errors.New("Failed to initialize client")
@@ -128,11 +111,9 @@ func InitializeClient(ui *input.UI, name string) (*OIDCClient, error) {
 
 func (c *OIDCClient) ClientForm() url.Values {
 	form := url.Values{}
-	clientId := c.config.GetString(CLIENT_ID)
-	form.Set("client_id", clientId)
-	secret := c.config.GetString(CLIENT_SECRET)
-	if secret != "" {
-		form.Set("client_secret", secret)
+	form.Set("client_id", c.clientId)
+	if c.clientSecret != "" {
+		form.Set("client_secret", c.clientSecret)
 	}
 	return form
 }
@@ -146,17 +127,15 @@ func (c *OIDCClient) Token() *WebTarget {
 }
 
 func (c *OIDCClient) RedirectToSuccessfulPage() *WebTarget {
-	url := c.config.GetString(SUCCESSFUL_REDIRECT_URL)
-	if url == "" {
-		return nil
+	if c.successURL != "" {
+		c.restClient.Target(c.successURL)
 	}
-	return c.restClient.Target(url)
+	return nil
 }
 
 func (c *OIDCClient) RedirectToFailurePage() *WebTarget {
-	url := c.config.GetString(FAILURE_REDIRECT_URL)
-	if url == "" {
-		return nil
+	if c.failureURL != "" {
+		return c.restClient.Target(c.failureURL)
 	}
-	return c.restClient.Target(url)
+	return nil
 }
