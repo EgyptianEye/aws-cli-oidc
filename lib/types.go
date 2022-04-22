@@ -24,7 +24,7 @@ func (c *AWSCredentials) isValid() bool {
 	if c == nil {
 		return false
 	}
-	if !c.Expires.IsZero() && time.Now().Local().After(c.Expires) {
+	if !c.Expires.IsZero() && time.Now().After(c.Expires) {
 		return false
 	}
 	sess, err := session.NewSessionWithOptions(session.Options{
