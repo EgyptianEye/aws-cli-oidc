@@ -1,3 +1,5 @@
+//go:build go1.12
+
 package lib
 
 import (
@@ -5,7 +7,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
 
@@ -47,7 +48,7 @@ func ConfigPath() string {
 	}
 	path := os.Getenv("AWS_CLI_OIDC_CONFIG")
 	if path == "" {
-		home, err := homedir.Dir()
+		home, err := os.UserHomeDir()
 		if err != nil {
 			Exit(err)
 		}
