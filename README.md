@@ -12,7 +12,7 @@ Please refer the following diagrams how it works.
 
 ![flow with oidc](flow-with-oidc.png)
 
-### Federation type: SAML 2.0
+### Federation type: SAML 2.0 (Discontinued)
 
 **Note: The OIDC provider must support [OAuth 2.0 Token Exchange](https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-15) for exchanging access token/ID token and SAML2 assertion.**
 
@@ -26,6 +26,8 @@ Before using this tool, the system administrator need to setup the following con
 - Registration OIDC/OAuth2 client for this CLI tool in the OIDC provider. Note: The OIDC provider must allow any port to be specified at the time of the request for loopback IP redirect URIs because this tool follows [RFC 8252 OAuth 2.0 for Native Apps 7.3 Loopback Interface Redirection](https://tools.ietf.org/html/rfc8252#section-7.3).
 
 Also depending on the federation type between AWS and the OIDC provider, requirements for the OIDC providers will change.
+
+Note: This tool has been updated to support [PKCE](https://oauth.net/2/pkce/).
 
 ### Federation type: OIDC
 
