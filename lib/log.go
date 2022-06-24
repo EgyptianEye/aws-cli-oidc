@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-var IsTraceEnabled bool
+var IsTraceEnabled bool = false
 
 func Write(format string, msg ...interface{}) {
 	fmt.Fprintf(os.Stderr, format, msg...)

@@ -1,45 +1,68 @@
 package lib
 
 import (
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/sts"
-	"github.com/pkg/errors"
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
-func GetCredentialsWithOIDC(client *OIDCClient, idToken, iamRoleArn, roleSessionName string, durationInSeconds int64) (*AWSCredentials, error) {
-	return loginToStsUsingIDToken(client, idToken, iamRoleArn, roleSessionName, durationInSeconds)
+func GetCredentialsWithOIDC(config *Config, it *idtoken) (*AWSCredentials, error) {
+	if len(it.Roles) > 0 {
+		if config.IAMRole != "" {
+			found := false
+			for _, role := range it.Roles {
+				if role == config.IAMRole {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Fprintf(os.Stderr, "Role \"%s\" not found in ID token, will try though...\n", config.IAMRole)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "Using %s from ID token as default role\n", it.Roles[0])
+			config.IAMRole = it.Roles[0]
+		}
+	}
+	return loginToStsUsingIDTokenV2(config, it)
 }
 
-func loginToStsUsingIDToken(client *OIDCClient, idToken, iamRoleArn, roleSessionName string, durationInSeconds int64) (*AWSCredentials, error) {
-	sess, err := session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	})
+type STSAssumeRoleWithWebIdentityAPI interface {
+	AssumeRoleWithWebIdentity(ctx context.Context,
+		params *sts.AssumeRoleWithWebIdentityInput,
+		optFns ...func(*sts.Options)) (*sts.AssumeRoleWithWebIdentityOutput, error)
+}
+
+func assumeRoleWithWebIdentity(c context.Context, api STSAssumeRoleWithWebIdentityAPI, input *sts.AssumeRoleWithWebIdentityInput) (*sts.AssumeRoleWithWebIdentityOutput, error) {
+	return api.AssumeRoleWithWebIdentity(c, input)
+}
+
+func loginToStsUsingIDTokenV2(c *Config, it *idtoken) (*AWSCredentials, error) {
+	ctx := context.TODO()
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create session")
+		panic("configuration error, " + err.Error())
 	}
-
-	svc := sts.New(sess)
-
-	params := &sts.AssumeRoleWithWebIdentityInput{
-		RoleArn:          aws.String(iamRoleArn),
-		RoleSessionName:  aws.String(roleSessionName),
-		WebIdentityToken: aws.String(idToken),
-		DurationSeconds:  aws.Int64(durationInSeconds),
+	input := &sts.AssumeRoleWithWebIdentityInput{
+		RoleArn:          &c.IAMRole,
+		RoleSessionName:  &it.PreferredUsername,
+		WebIdentityToken: &it.raw,
+		DurationSeconds:  &c.SessionDuration,
 	}
-
-	Writeln("Requesting AWS credentials using ID Token")
-
-	resp, err := svc.AssumeRoleWithWebIdentity(params)
+	assumed, err := assumeRoleWithWebIdentity(ctx, sts.NewFromConfig(cfg), input)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error retrieving STS credentials using ID Token")
+		return nil, err
 	}
-
-	return &AWSCredentials{
-		AWSAccessKey:    aws.StringValue(resp.Credentials.AccessKeyId),
-		AWSSecretKey:    aws.StringValue(resp.Credentials.SecretAccessKey),
-		AWSSessionToken: aws.StringValue(resp.Credentials.SessionToken),
-		PrincipalARN:    aws.StringValue(resp.AssumedRoleUser.Arn),
-		Expires:         resp.Credentials.Expiration.Local(),
-	}, nil
+	result := &AWSCredentials{
+		AWSAccessKey:    aws.ToString(assumed.Credentials.AccessKeyId),
+		AWSSecretKey:    aws.ToString(assumed.Credentials.SecretAccessKey),
+		AWSSessionToken: aws.ToString(assumed.Credentials.SessionToken),
+		PrincipalARN:    aws.ToString(assumed.AssumedRoleUser.Arn),
+		Expires:         assumed.Credentials.Expiration.Local(),
+	}
+	return result, nil
 }

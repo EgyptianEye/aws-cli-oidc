@@ -7,7 +7,6 @@ import (
 
 	"github.com/openstandia/aws-cli-oidc/lib"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var getCredCmd = &cobra.Command{
@@ -31,12 +30,14 @@ func getCred(cmd *cobra.Command, args []string) {
 	if providerName == "" {
 		lib.Exit(errors.New("the OIDC provider name is required"))
 	}
-	roleArn, _ := cmd.Flags().GetString("role")
-	maxDurationSeconds, _ := cmd.Flags().GetString("max-duration")
-	useSecret, _ := cmd.Flags().GetString("use-secret")
+	var a lib.CmdArgs
+	a.IdP, _ = cmd.Flags().GetString("provider")
+	a.PreferedRole, _ = cmd.Flags().GetString("role")
+	a.SessionDuration, _ = cmd.Flags().GetInt32("max-duration")
+	a.Secret, _ = cmd.Flags().GetString("use-secret")
 	asJson, _ := cmd.Flags().GetBool("json")
 
-	lib.Exit(output(asJson)(authenticate(useSecret, lib.MergedConfig(providerName, roleArn, maxDurationSeconds))))
+	lib.Exit(output(asJson)(authenticate(a)))
 }
 
 func output(json bool) func(*lib.AWSCredentials, error) error {
@@ -57,23 +58,25 @@ func output(json bool) func(*lib.AWSCredentials, error) error {
 	}
 }
 
-func authenticate(store string, config *viper.Viper) (cred *lib.AWSCredentials, err error) {
-	roleArn := config.GetString(lib.IAM_ROLE_ARN)
-	useSecret := lib.InitializeSecret(store, config.GetString(lib.IdP)) == nil
-	if useSecret {
-		cred, err = lib.GetStoredAWSCredential(roleArn)
+func authenticate(args lib.CmdArgs) (cred *lib.AWSCredentials, err error) {
+	useSecret := lib.InitializeSecret(args.Secret, args.IdP) == nil
+	config, err := lib.RuntimeConfig(args)
+	if err != nil {
+		lib.Exit(err)
+	}
+	if useSecret && config.IAMRole == "" {
+		lib.Write("Secret \"%s\" has been configured but disabled, because no roles were specified.\n(Behaviors will depend on the 'roles' claim in ID tokens, which is subject to change.)\n", args.Secret)
+	}
+	if useSecret && config.IAMRole != "" {
+		cred, err = lib.GetStoredAWSCredential(config.IAMRole)
 		if err == nil {
 			return
 		}
 	}
-	client, err := lib.InitializeClient(config)
-	if err != nil {
-		lib.Exit(err)
-	}
-	cred, err = lib.Authenticate(client, config)
-	if err == nil && useSecret {
-		lib.StoreAWSCredential(roleArn, cred)
-		lib.Write("The AWS credentials has been saved in " + store)
+	cred, err = lib.Authenticate(config)
+	if err == nil && useSecret && config.IAMRole != "" {
+		lib.StoreAWSCredential(config.IAMRole, cred)
+		lib.Write("The AWS credentials has been saved in " + args.Secret)
 	}
 	return
 }
