@@ -65,18 +65,19 @@ func authenticate(args lib.CmdArgs) (cred *lib.AWSCredentials, err error) {
 		lib.Exit(err)
 	}
 	if useSecret && config.IAMRole == "" {
-		lib.Write("Secret \"%s\" has been configured but disabled, because no roles were specified.\n(Behaviors will depend on the 'roles' claim in ID tokens, which is subject to change.)\n", args.Secret)
+		lib.Write("secret \"%s\" has been configured but disabled, because no roles were specified.\n(Behaviors will depend on the 'roles' claim in ID tokens, which is subject to change.)\n", args.Secret)
 	}
 	if useSecret && config.IAMRole != "" {
 		cred, err = lib.GetStoredAWSCredential(config.IAMRole)
 		if err == nil {
 			return
 		}
+		fmt.Fprintf(os.Stderr, "%s (probably needs to be authenticated again)\n", err)
 	}
 	cred, err = lib.Authenticate(config)
 	if err == nil && useSecret && config.IAMRole != "" {
 		lib.StoreAWSCredential(config.IAMRole, cred)
-		lib.Write("The AWS credentials has been saved in " + args.Secret)
+		lib.Writeln("the AWS credentials has been saved in %s", args.Secret)
 	}
 	return
 }

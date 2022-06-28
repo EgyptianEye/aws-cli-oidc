@@ -9,7 +9,7 @@ func Authenticate(config *Config) (*AWSCredentials, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to login the OIDC provider: %w", err)
 	}
-	Writeln("Login successful!")
+	Writeln("login successful!")
 	Traceln("ID token: %s", it.raw)
 	var awsCreds *AWSCredentials
 	awsCreds, err = GetCredentialsWithOIDC(config, it)

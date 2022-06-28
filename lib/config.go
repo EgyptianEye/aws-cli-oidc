@@ -14,6 +14,7 @@ type Config struct {
 	ClientID        string   `json:"client_id"`
 	ClientSecret    string   `json:"client_secret"`
 	IAMRole         string   `json:"iam_role"`
+	RoleClaim       string   `json:"role_claim"`
 	MetaURL         string   `json:"meta"`
 	Scopes          []string `json:"scopes"`
 }

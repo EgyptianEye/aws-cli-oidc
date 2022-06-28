@@ -53,10 +53,10 @@ type oidcMetadataResponse struct {
 }
 
 type idtoken struct {
-	raw               string   `json:"-"`
-	Username          string   `json:"username"`
-	PreferredUsername string   `json:"preferred_username"`
-	Roles             []string `json:"roles"`
+	Username          string                     `json:"username"`
+	PreferredUsername string                     `json:"preferred_username"`
+	raw               string                     `json:"-"`
+	object            map[string]json.RawMessage `json:"-"`
 }
 
 func getOIDCConfig(c *Config) (*oauth2.Config, error) {
@@ -87,7 +87,7 @@ func codeFlow(config *Config) (*idtoken, error) {
 	}
 	listener, err := net.Listen("tcp", "127.0.0.1:")
 	if err != nil {
-		return nil, errors.Wrap(err, "Cannot start local http server to handle login redirect")
+		return nil, errors.Wrap(err, "cannot start local http server to handle login redirect")
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	redir := fmt.Sprintf("http://127.0.0.1:%d", port)
@@ -103,7 +103,7 @@ func codeFlow(config *Config) (*idtoken, error) {
 	if code := launch(listener, url); code != "" {
 		return exchangeToken(oconf, code, cv.verifier)
 	} else {
-		return nil, errors.New("Login failed, can't retrieve authorization code")
+		return nil, errors.New("login failed, can't retrieve authorization code")
 	}
 }
 
@@ -161,20 +161,42 @@ func exchangeToken(oconf *oauth2.Config, code, verifier string) (*idtoken, error
 	if !ok {
 		return nil, errors.Wrap(err, "failed to turn code into token")
 	}
-	return unmarshall(token1)
+	return newIDToken(token1)
 }
 
-func unmarshall(s string) (*idtoken, error) {
+func newIDToken(s string) (*idtoken, error) {
 	part := strings.Split(s, ".")
 	if len(part) != 3 {
 		return nil, errors.New("invalid ID token")
 	}
+	decoded, err := base64.RawURLEncoding.DecodeString(part[1])
+	if err != nil {
+		return nil, err
+	}
 	var it idtoken
-	if err := json.NewDecoder(base64.NewDecoder(base64.RawURLEncoding, strings.NewReader(part[1]))).Decode(&it); err != nil {
+	if err := json.Unmarshal(decoded, &it); err != nil {
 		return nil, err
 	}
 	it.raw = s
+	it.object = make(map[string]json.RawMessage)
+	if err := json.Unmarshal(decoded, &it.object); err != nil {
+		fmt.Println(err)
+	}
 	return &it, nil
+}
+
+func (i *idtoken) getRoles(claim string) []string {
+	if rawMessage, ok := i.object[claim]; ok {
+		var ss []string
+		if err := json.Unmarshal(rawMessage, &ss); err == nil {
+			return ss
+		}
+		var s string
+		if err := json.Unmarshal(rawMessage, &s); err == nil {
+			return []string{s}
+		}
+	}
+	return []string{}
 }
 
 type codeVerifer struct {

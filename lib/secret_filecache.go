@@ -50,7 +50,7 @@ func (sf *FileStore) Get(roleArn string) (*AWSCredentials, error) {
 	if !ok {
 		return nil, fmt.Errorf("credentials not found for %s", roleArn)
 	}
-	Writeln("Got credential from file store for %s", roleArn)
+	Writeln("got credential from file store for %s", roleArn)
 	return c, nil
 }
 
